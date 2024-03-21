@@ -22,13 +22,30 @@ namespace Bank_API_Service.CsvHelperService
             }
         }
 
+        public static void ReWriteToCSV(List<Account> listToWrite)
+        {
+            File.Delete("accounts.csv");
+            using (var writer = new StreamWriter("accounts.csv"))
+            using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
+            {
+                csv.WriteRecords(listToWrite);
+            }
+        }
+
         public static List<Account> ReadFromCsv() 
         {
-            // проверка на существование файла
+            if (!File.Exists("accounts.csv"))
+            {
+                return new List<Account>();
+            }
+
             using (var reader = new StreamReader("accounts.csv"))
             using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
+            {
+                // Read all records and return as list of Person objects
+                return csv.GetRecords<Account>().ToList();
+            }
 
-            return csv.GetRecords<Account>().ToList();
         }
 
         public static Account GetAccountById(int id)
@@ -44,5 +61,19 @@ namespace Bank_API_Service.CsvHelperService
             }
             return new Account() { Id = -1 };
         }
+
+        public static void DeleteAccount(int id)
+        {
+            // Get all accounts
+            var allAccounts = ReadFromCsv();
+
+            // Delete account with id from list all acounts
+            var accountToDelete = allAccounts.FirstOrDefault(x => x.Id == id);
+            allAccounts.Remove(accountToDelete);
+
+            // Rewrite file using new list of accounts
+            CsvService.ReWriteToCSV(allAccounts);
+        }
+
     }
 }
