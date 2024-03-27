@@ -10,6 +10,7 @@
 *.userosscache
 *.sln.docstates
 
+
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
@@ -375,6 +376,11 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/BankApiService/accounts.csv
+/BankApiService/id.txt
+/BankApiService/transaction.csv
+*.csv
+*.txt
 
 # VS Code files for those working on multiple tools
 .vscode/*
