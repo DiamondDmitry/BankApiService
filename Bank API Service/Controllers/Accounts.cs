@@ -80,12 +80,12 @@ namespace Bank_API_Service.Controllers
         {
             var accountToDeposit = CsvService<Account>.GetEntityById(id, _accountFileName);
 
-            accountToDeposit.Balance += depositRequest.Amount;
-
             if (accountToDeposit.Id == -1)
             {
                 return BadRequest($"Account ID: {id} not found.");
             }
+
+            accountToDeposit.Balance += depositRequest.Amount;
 
             accountToDeposit.Transactions = TransactionService.GetTransactionsById(accountToDeposit.Id, _transactionFileName);
 
@@ -115,12 +115,12 @@ namespace Bank_API_Service.Controllers
         {
             var accountFromWithdraw = CsvService<Account>.GetEntityById(id, _accountFileName);
 
-            accountFromWithdraw.Balance -= withdrawRequest.Amount;
-
             if (accountFromWithdraw.Id == -1)
             {
                 return BadRequest($"Account ID: {id} not found.");
             }
+
+            accountFromWithdraw.Balance -= withdrawRequest.Amount;
 
             accountFromWithdraw.Transactions = TransactionService.GetTransactionsById(accountFromWithdraw.Id, _transactionFileName);
 
@@ -141,6 +141,62 @@ namespace Bank_API_Service.Controllers
 
             return Ok(accountFromWithdraw);
         }
+
+        [HttpPost("{id}/transfer")]
+        public ActionResult<Account> Transfer(
+        [FromBody] TransferRequest transferRequest)
+        {
+            var accountFromWithdraw = CsvService<Account>.GetEntityById(transferRequest.FromId, _accountFileName);
+            var accountToDeposit = CsvService<Account>.GetEntityById(transferRequest.ToId, _accountFileName);
+
+            if (accountFromWithdraw.Id == -1)
+            {
+                return BadRequest($"Account ID: {transferRequest.FromId} not found.");
+            }
+            else if (accountToDeposit.Id == -1)
+            {
+                return BadRequest($"Account ID: {transferRequest.ToId} not found.");
+            }
+
+            accountFromWithdraw.Balance -= transferRequest.Amount;
+            accountToDeposit.Balance += transferRequest.Amount;
+
+            accountFromWithdraw.Transactions = TransactionService.GetTransactionsById(accountFromWithdraw.Id, _transactionFileName);
+            accountToDeposit.Transactions = TransactionService.GetTransactionsById(accountToDeposit.Id, _transactionFileName);
+
+            var transactionFrom = new Transaction
+            {
+                Id = IdHelper.GetNextTransactionId(),
+                Amount = transferRequest.Amount,
+                Date = DateTime.Now,
+                TransactionType = TransactionType.Transfer,
+                AccountId = accountFromWithdraw.Id,
+                OldBalance = accountFromWithdraw.Balance + transferRequest.Amount,
+                NewBalance = accountFromWithdraw.Balance
+            };
+
+            accountFromWithdraw.Transactions.Add(transactionFrom);
+            CsvService<Account>.UpdateEntityInformation(accountFromWithdraw, _accountFileName);
+            CsvService<Transaction>.WriteToCSV(new List<Transaction>() { transactionFrom }, _transactionFileName);
+
+            var transactionTo = new Transaction
+            {
+                Id = IdHelper.GetNextTransactionId(),
+                Amount = transferRequest.Amount,
+                Date = DateTime.Now,
+                TransactionType = TransactionType.Transfer,
+                AccountId = accountToDeposit.Id,
+                OldBalance = accountToDeposit.Balance - transferRequest.Amount,
+                NewBalance = accountToDeposit.Balance
+            };
+
+            accountToDeposit.Transactions.Add(transactionTo);
+            CsvService<Account>.UpdateEntityInformation(accountToDeposit, _accountFileName);
+            CsvService<Transaction>.WriteToCSV(new List<Transaction>() { transactionTo }, _transactionFileName);
+
+            return Ok(accountFromWithdraw);
+        }
+
 
         [HttpPut("{id}")]
         public ActionResult<Account> UpdateOwnerName(
