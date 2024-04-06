@@ -6,6 +6,7 @@ using BankApiService.IdService;
 using BankApiService.Models;
 using BankApiService.Requests;
 using Microsoft.AspNetCore.Mvc;
+using System.Configuration;
 using System.Security.Principal;
 using Transaction = BankApiService.Models.Transaction;
 
@@ -18,15 +19,21 @@ namespace BankApiService.Controllers
         private readonly CsvService<Account> csvAccountService;
         private readonly CsvService<Transaction> csvTransactionService;
         private readonly ILogger<Accounts> _logger;
+        private readonly IConfiguration _configuration;
+        private readonly SecondTestService _secondTestService;
 
         public Accounts(
                 CsvService<Account> csvService,
                 CsvService<Transaction> csvService1,
-                ILogger<Accounts> logger)
+                ILogger<Accounts> logger,
+                IConfiguration configuration,
+                SecondTestService secondTestService)
         {
             csvAccountService = csvService;
             csvTransactionService = csvService1;
             _logger = logger;
+            _configuration = configuration;
+            _secondTestService = secondTestService;
         }
 
         private const string _accountFileName = "accounts.csv";
@@ -37,8 +44,10 @@ namespace BankApiService.Controllers
         [HttpGet("ping")]
         public ActionResult Ping()
         {
+            var pinginformation = _configuration.Get<PingInformation>();
+            _secondTestService.callWarning();
 
-            return Ok();
+            return Ok(pinginformation);
         }
 
         [HttpGet]

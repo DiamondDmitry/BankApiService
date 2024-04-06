@@ -31,6 +31,9 @@ namespace BankApiService
             builder.Services.AddSingleton<CsvService<Account>>();
             builder.Services.AddSingleton<CsvService<Transaction>>();
 
+            builder.Services.AddSingleton<SecondTestService>();
+            builder.Services.AddSingleton<FirstTestService>();
+
             builder.Services.AddTransient<RequestService>();
             builder.Services.AddSingleton<SingletonDep>();
             builder.Services.AddTransient<TransientDep>();
