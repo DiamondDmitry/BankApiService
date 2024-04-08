@@ -49,6 +49,7 @@ namespace BankApiService.Services
         public void UpdateAccount(Account account)
         {
             _context.Accounts.Update(account);
+            _context.SaveChanges();
         }
     }
 }
