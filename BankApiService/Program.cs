@@ -1,9 +1,13 @@
 using System;
+using System.Configuration;
+using BankApiService.Context;
 using BankApiService.Controllers;
 using BankApiService.CsvHelperService;
 using BankApiService.Dependcies;
 using BankApiService.Dependcies.LifeCycle;
 using BankApiService.Models;
+using BankApiService.Services;
+using Microsoft.EntityFrameworkCore;
 
 namespace BankApiService
 {
@@ -27,17 +31,24 @@ namespace BankApiService
 
             builder.Services.AddControllers();
 
+
+            builder.Services.AddEntityFrameworkSqlite()
+                .AddDbContext<BankContext>();
+
+
+            var serviceProvide = builder.Services.BuildServiceProvider();
+            var context = serviceProvide.GetRequiredService<BankContext>();
+            context.Database.EnsureCreated();
+
+
             // DI
+            builder.Services.AddSingleton<IAccountsService, AccountsService>();
+
             builder.Services.AddSingleton<CsvService<Account>>();
             builder.Services.AddSingleton<CsvService<Transaction>>();
 
             builder.Services.AddSingleton<SecondTestService>();
             builder.Services.AddSingleton<FirstTestService>();
-
-            builder.Services.AddTransient<RequestService>();
-            builder.Services.AddSingleton<SingletonDep>();
-            builder.Services.AddTransient<TransientDep>();
-            builder.Services.AddScoped<ScopedDep>();
 
             builder.Services.AddEndpointsApiExplorer();
 

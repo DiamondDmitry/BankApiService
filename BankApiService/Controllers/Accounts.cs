@@ -5,6 +5,7 @@ using BankApiService.Enums;
 using BankApiService.IdService;
 using BankApiService.Models;
 using BankApiService.Requests;
+using BankApiService.Services;
 using Microsoft.AspNetCore.Mvc;
 using System.Configuration;
 using System.Security.Principal;
@@ -19,13 +20,20 @@ namespace BankApiService.Controllers
         private readonly CsvService<Account> csvAccountService;
         private readonly CsvService<Transaction> csvTransactionService;
         private readonly ILogger<Accounts> _logger;
+        // DB Sqlite
+        private readonly IAccountsService _accountsService;
+
+        //home work
         private readonly IConfiguration _configuration;
         private readonly SecondTestService _secondTestService;
+
+
 
         public Accounts(
                 CsvService<Account> csvService,
                 CsvService<Transaction> csvService1,
                 ILogger<Accounts> logger,
+                IAccountsService accountsService,
                 IConfiguration configuration,
                 SecondTestService secondTestService)
         {
@@ -34,6 +42,7 @@ namespace BankApiService.Controllers
             _logger = logger;
             _configuration = configuration;
             _secondTestService = secondTestService;
+            _accountsService = accountsService;
         }
 
         private const string _accountFileName = "accounts.csv";
@@ -57,18 +66,12 @@ namespace BankApiService.Controllers
 
             try
             {
-                var accountList = csvAccountService.ReadFromCsv(_accountFileName);
-
-                foreach ( var account in accountList ) 
-                {
-                    account.Transactions = TransactionService.GetTransactionsById(account.Id, _transactionFileName);
-                }
-                return Ok(accountList);
-
-                _logger.LogError("Successfully got all accounts.");
+                var accountsList = _accountsService.GetAccounts();
+                return Ok(accountsList);
             }
             catch (Exception ex)
             {
+                _logger.LogError("ERROR");
                 return BadRequest(ex.Message);
             }
         }
@@ -76,10 +79,10 @@ namespace BankApiService.Controllers
         [HttpGet("{id}")]
         public ActionResult<Account> GetAccountById([FromRoute] int id)
         {
-            var account = csvAccountService.GetEntityById(id, _accountFileName);
+            var account = _accountsService.GetAccountById(id);
 
-            if (account.Id == -1)
-            {
+            if (account == null)
+            { 
                 return BadRequest($"Account ID: {id} not found.");
             }
 
@@ -95,15 +98,10 @@ namespace BankApiService.Controllers
 
             account.Number = random.Next(100, 99999);
             account.Owner = accountRequest.Owner;
-            var nextId = IdHelper.GetNextId(_accountIdFileName);
-            account.Id = nextId;
-
-            var listAccounts = new List<Account>();
-            listAccounts.Add(account);
 
             try
             {
-                csvAccountService.WriteToCsv(listAccounts, _accountFileName);
+                _accountsService.AddAccount(account);
             }
             catch (Exception ex)
             {
@@ -245,16 +243,16 @@ namespace BankApiService.Controllers
             [FromBody] UpdateOwnerNameRequest updateRequest
             )
         {
-            var account = csvAccountService.GetEntityById(id, _accountFileName);
+            var account = _accountsService.GetAccountById(id);
 
-            if (account.Id == -1)
+            if (account == null)
             {
                 return BadRequest($"Account ID: {id} not found.");
             }
 
             account.Owner = updateRequest.Owner;
 
-            csvAccountService.UpdateEntityInformation(account, _accountFileName);
+            _accountsService.UpdateAccount(account);
 
             return Accepted();
         }
@@ -263,7 +261,7 @@ namespace BankApiService.Controllers
         [HttpDelete("{id}")]
         public ActionResult DeleteById([FromRoute]int id)
         {
-            csvAccountService.DeleteEntity(id, _accountFileName);
+            _accountsService.DeleteAccount(id);
             return Ok();
         }
     }
