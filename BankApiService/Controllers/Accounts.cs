@@ -67,21 +67,16 @@ namespace BankApiService.Controllers
         [HttpPost]
         public ActionResult<Account> CreateAccount([FromBody] CreateAccountRequest accountRequest)
         {
-            var random = new Random();
-            var account = new Account();
-
-            account.Number = random.Next(100, 99999);
-            account.Owner = accountRequest.Owner;
 
             try
             {
-                _accountsService.AddAccount(account);
+                return _accountsService.AddAccount(accountRequest);
             }
             catch (Exception ex)
             {
                 return BadRequest(ex.Message);
             }
-            return Ok(account);
+
         }
 
         [HttpPost("{id}/deposit")]
@@ -95,28 +90,14 @@ namespace BankApiService.Controllers
             {
                 return BadRequest($"Account with ID: {id} not found.");
             }
-            accountToDeposit.Balance += depositRequest.Amount;
 
-            var transaction = new Transaction
-            {
-                Amount = depositRequest.Amount,
-                Date = DateTime.Now,
-                TransactionType = TransactionType.Deposit,
-                AccountId = accountToDeposit.Id,
-                OldBalance = accountToDeposit.Balance - depositRequest.Amount,
-                NewBalance = accountToDeposit.Balance
-            };
-
-            _accountsService.UpdateAccount(accountToDeposit);
-            _transactionsService.AddTransaction(transaction);
-
-            return Ok(accountToDeposit);
+            return Ok(_accountsService.DepositeAccount(accountToDeposit, depositRequest));
         }
 
         [HttpPost("{id}/withdraw")]
         public ActionResult<Account> WithdrawFromAccount(
-        [FromRoute] int id,
-        [FromBody] WithdrawRequest withdrawRequest)
+                [FromRoute] int id,
+                [FromBody] WithdrawRequest withdrawRequest)
         {
             var accountWithdrawFrom = _accountsService.GetAccountById(id);
 
@@ -124,22 +105,8 @@ namespace BankApiService.Controllers
             {
                 return BadRequest($"Account with ID: {id} not found.");
             }
-            accountWithdrawFrom.Balance -= withdrawRequest.Amount;
 
-            var transaction = new Transaction
-            {
-                Amount = withdrawRequest.Amount,
-                Date = DateTime.Now,
-                TransactionType = TransactionType.Withdraw,
-                AccountId = accountWithdrawFrom.Id,
-                OldBalance = accountWithdrawFrom.Balance + withdrawRequest.Amount,
-                NewBalance = accountWithdrawFrom.Balance
-            };
-
-            _accountsService.UpdateAccount(accountWithdrawFrom);
-            _transactionsService.AddTransaction(transaction);
-
-            return Ok(accountWithdrawFrom);
+            return Ok(_accountsService.WithdrawAccount(accountWithdrawFrom, withdrawRequest));
         }
 
         [HttpPost("transfer")]
@@ -148,7 +115,7 @@ namespace BankApiService.Controllers
             var accountFrom = _accountsService.GetAccountById(transferRequest.FromId);
             var accountTo = _accountsService.GetAccountById(transferRequest.ToId);
 
-            if (accountFrom == null )
+            if (accountFrom == null)
             {
                 return BadRequest($"Account with ID: {transferRequest.FromId} not found.");
             }
@@ -157,36 +124,7 @@ namespace BankApiService.Controllers
                 return BadRequest($"Account with ID: {transferRequest.ToId} not found.");
             }
 
-            accountFrom.Balance -= transferRequest.Amount;
-            accountTo.Balance += transferRequest.Amount;
-
-            var transactionFrom = new Transaction
-            {
-                Amount = transferRequest.Amount,
-                Date = DateTime.Now,
-                TransactionType = TransactionType.Transfer,
-                AccountId = accountFrom.Id,
-                OldBalance = accountFrom.Balance + transferRequest.Amount,
-                NewBalance = accountFrom.Balance
-            };
-
-            _accountsService.UpdateAccount(accountFrom);
-            _transactionsService.AddTransaction(transactionFrom);
-
-            var transactionTo = new Transaction
-            {
-                Amount = transferRequest.Amount,
-                Date = DateTime.Now,
-                TransactionType = TransactionType.Transfer,
-                AccountId = accountTo.Id,
-                OldBalance = accountTo.Balance - transferRequest.Amount,
-                NewBalance = accountTo.Balance
-            };
-
-            _accountsService.UpdateAccount(accountTo);
-            _transactionsService.AddTransaction(transactionTo);
-
-            return Ok(accountFrom);
+            return Ok(_accountsService.Transfer(transferRequest));
         }
 
 
