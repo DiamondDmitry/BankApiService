@@ -1,13 +1,5 @@
-using System;
-using System.Configuration;
 using BankApiService.Context;
-using BankApiService.Controllers;
-using BankApiService.CsvHelperService;
-using BankApiService.Dependcies;
-using BankApiService.Dependcies.LifeCycle;
-using BankApiService.Models;
 using BankApiService.Services;
-using Microsoft.EntityFrameworkCore;
 
 namespace BankApiService
 {
@@ -33,25 +25,19 @@ namespace BankApiService
 
 
             builder.Services.AddEntityFrameworkSqlite()
-                .AddDbContext<BankContext>();
-
+                            .AddDbContext<BankContext>();
 
             var serviceProvide = builder.Services.BuildServiceProvider();
             var context = serviceProvide.GetRequiredService<BankContext>();
+
+            //Check database exists, if not create it
             context.Database.EnsureCreated();
 
 
             // DI
             builder.Services.AddSingleton<IAccountsService, AccountsService>();
-
-            builder.Services.AddSingleton<CsvService<Account>>();
-            builder.Services.AddSingleton<CsvService<Transaction>>();
-
-            builder.Services.AddSingleton<SecondTestService>();
-            builder.Services.AddSingleton<FirstTestService>();
-
+            builder.Services.AddSingleton<ITransactionsService, TransactionsService>();
             builder.Services.AddEndpointsApiExplorer();
-
             builder.Services.AddSwaggerGen();
 
             // Add Cors
@@ -71,7 +57,6 @@ namespace BankApiService
             };
 
             // Configure the HTTP request pipeline.
-
             app.UseHttpsRedirection();
 
             app.UseAuthorization();

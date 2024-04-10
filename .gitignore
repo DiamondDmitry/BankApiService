@@ -381,6 +381,9 @@ FodyWeavers.xsd
 /BankApiService/transaction.csv
 *.csv
 *.txt
+/BankApiService/mydatabase.db
+/BankApiService/mydatabase.db-shm
+/BankApiService/mydatabase.db-wal
 
 # VS Code files for those working on multiple tools
 .vscode/*

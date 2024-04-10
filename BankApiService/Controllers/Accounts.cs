@@ -1,15 +1,8 @@
-﻿using BankApiService.CsvHelperService;
-using BankApiService.Dependcies;
-using BankApiService.Dependcies.LifeCycle;
-using BankApiService.Enums;
-using BankApiService.IdService;
+﻿using BankApiService.Enums;
 using BankApiService.Models;
 using BankApiService.Requests;
 using BankApiService.Services;
 using Microsoft.AspNetCore.Mvc;
-using System.Configuration;
-using System.Security.Principal;
-using Transaction = BankApiService.Models.Transaction;
 
 namespace BankApiService.Controllers
 {
@@ -17,46 +10,28 @@ namespace BankApiService.Controllers
     [ApiController]
     public class Accounts : ControllerBase
     {
-        private readonly CsvService<Account> csvAccountService;
-        private readonly CsvService<Transaction> csvTransactionService;
         private readonly ILogger<Accounts> _logger;
         // DB Sqlite
         private readonly IAccountsService _accountsService;
+        private readonly ITransactionsService _transactionsService;
 
-        //home work
-        private readonly IConfiguration _configuration;
-        private readonly SecondTestService _secondTestService;
 
 
 
         public Accounts(
-                CsvService<Account> csvService,
-                CsvService<Transaction> csvService1,
                 ILogger<Accounts> logger,
                 IAccountsService accountsService,
-                IConfiguration configuration,
-                SecondTestService secondTestService)
+                ITransactionsService transactionsService)
         {
-            csvAccountService = csvService;
-            csvTransactionService = csvService1;
             _logger = logger;
-            _configuration = configuration;
-            _secondTestService = secondTestService;
             _accountsService = accountsService;
+            _transactionsService = transactionsService;
         }
-
-        private const string _accountFileName = "accounts.csv";
-        private const string _transactionFileName = "transactions.csv";
-        private const string _accountIdFileName = "id.txt";
-        private const string _transactionIdFileName = "t_id.txt";
 
         [HttpGet("ping")]
         public ActionResult Ping()
         {
-            var pinginformation = _configuration.Get<PingInformation>();
-            _secondTestService.callWarning();
-
-            return Ok(pinginformation);
+           return Ok("pong");
         }
 
         [HttpGet]
@@ -83,10 +58,9 @@ namespace BankApiService.Controllers
 
             if (account == null)
             { 
-                return BadRequest($"Account ID: {id} not found.");
+                return BadRequest($"Account with ID: {id} not found.");
             }
 
-            account.Transactions = TransactionService.GetTransactionsById(account.Id, _transactionFileName);
             return Ok(account);
         }
 
@@ -115,20 +89,16 @@ namespace BankApiService.Controllers
             [FromRoute] int id,
             [FromBody] DepositRequest depositRequest) 
         {
-            var accountToDeposit = csvAccountService.GetEntityById(id, _accountFileName);
+            var accountToDeposit = _accountsService.GetAccountById(id);
 
-            if (accountToDeposit.Id == -1)
+            if (accountToDeposit == null)
             {
-                return BadRequest($"Account ID: {id} not found.");
+                return BadRequest($"Account with ID: {id} not found.");
             }
-
             accountToDeposit.Balance += depositRequest.Amount;
-
-            accountToDeposit.Transactions = TransactionService.GetTransactionsById(accountToDeposit.Id, _transactionFileName);
 
             var transaction = new Transaction
             {
-                Id = IdHelper.GetNextId(_transactionIdFileName),
                 Amount = depositRequest.Amount,
                 Date = DateTime.Now,
                 TransactionType = TransactionType.Deposit,
@@ -137,10 +107,8 @@ namespace BankApiService.Controllers
                 NewBalance = accountToDeposit.Balance
             };
 
-            accountToDeposit.Transactions.Add(transaction);
-
-            csvAccountService.UpdateEntityInformation(accountToDeposit, _accountFileName);
-            csvTransactionService.WriteToCsv(new List<Transaction>() { transaction }, _transactionFileName);
+            _accountsService.UpdateAccount(accountToDeposit);
+            _transactionsService.AddTransaction(transaction);
 
             return Ok(accountToDeposit);
         }
@@ -150,60 +118,50 @@ namespace BankApiService.Controllers
         [FromRoute] int id,
         [FromBody] WithdrawRequest withdrawRequest)
         {
-            var accountFromWithdraw = csvAccountService.GetEntityById(id, _accountFileName);
+            var accountWithdrawFrom = _accountsService.GetAccountById(id);
 
-            if (accountFromWithdraw.Id == -1)
+            if (accountWithdrawFrom == null)
             {
-                return BadRequest($"Account ID: {id} not found.");
+                return BadRequest($"Account with ID: {id} not found.");
             }
-
-            accountFromWithdraw.Balance -= withdrawRequest.Amount;
-
-            accountFromWithdraw.Transactions = TransactionService.GetTransactionsById(accountFromWithdraw.Id, _transactionFileName);
+            accountWithdrawFrom.Balance -= withdrawRequest.Amount;
 
             var transaction = new Transaction
             {
-                Id = IdHelper.GetNextId(_transactionIdFileName),
                 Amount = withdrawRequest.Amount,
                 Date = DateTime.Now,
                 TransactionType = TransactionType.Withdraw,
-                AccountId = accountFromWithdraw.Id,
-                OldBalance = accountFromWithdraw.Balance + withdrawRequest.Amount,
-                NewBalance = accountFromWithdraw.Balance
+                AccountId = accountWithdrawFrom.Id,
+                OldBalance = accountWithdrawFrom.Balance + withdrawRequest.Amount,
+                NewBalance = accountWithdrawFrom.Balance
             };
 
-            accountFromWithdraw.Transactions.Add(transaction);
-            csvAccountService.UpdateEntityInformation(accountFromWithdraw, _accountFileName);
-            csvTransactionService.WriteToCsv(new List<Transaction>() { transaction }, _transactionFileName);
+            _accountsService.UpdateAccount(accountWithdrawFrom);
+            _transactionsService.AddTransaction(transaction);
 
-            return Ok(accountFromWithdraw);
+            return Ok(accountWithdrawFrom);
         }
 
         [HttpPost("transfer")]
-        public ActionResult<Account> Transfer(
-        [FromBody] TransferRequest transferRequest)
+        public ActionResult<Account> Transfer([FromBody] TransferRequest transferRequest)
         {
-            var accountFrom = csvAccountService.GetEntityById(transferRequest.FromId, _accountFileName);
-            var accountTo = csvAccountService.GetEntityById(transferRequest.ToId, _accountFileName);
+            var accountFrom = _accountsService.GetAccountById(transferRequest.FromId);
+            var accountTo = _accountsService.GetAccountById(transferRequest.ToId);
 
-            if (accountFrom.Id == -1)
+            if (accountFrom == null )
             {
-                return BadRequest($"Account ID: {transferRequest.FromId} not found.");
+                return BadRequest($"Account with ID: {transferRequest.FromId} not found.");
             }
-            else if (accountTo.Id == -1)
+            else if (accountTo == null)
             {
-                return BadRequest($"Account ID: {transferRequest.ToId} not found.");
+                return BadRequest($"Account with ID: {transferRequest.ToId} not found.");
             }
 
             accountFrom.Balance -= transferRequest.Amount;
             accountTo.Balance += transferRequest.Amount;
 
-            accountFrom.Transactions = TransactionService.GetTransactionsById(accountFrom.Id, _transactionFileName);
-            accountTo.Transactions = TransactionService.GetTransactionsById(accountTo.Id, _transactionFileName);
-
             var transactionFrom = new Transaction
             {
-                Id = IdHelper.GetNextId(_transactionIdFileName),
                 Amount = transferRequest.Amount,
                 Date = DateTime.Now,
                 TransactionType = TransactionType.Transfer,
@@ -212,14 +170,11 @@ namespace BankApiService.Controllers
                 NewBalance = accountFrom.Balance
             };
 
-            accountFrom.Transactions.Add(transactionFrom);
-            csvAccountService.UpdateEntityInformation(accountFrom, _accountFileName);
-            csvTransactionService.WriteToCsv(new List<Transaction>() { transactionFrom }, _transactionFileName);
-
+            _accountsService.UpdateAccount(accountFrom);
+            _transactionsService.AddTransaction(transactionFrom);
 
             var transactionTo = new Transaction
             {
-                Id = IdHelper.GetNextId(_transactionIdFileName),
                 Amount = transferRequest.Amount,
                 Date = DateTime.Now,
                 TransactionType = TransactionType.Transfer,
@@ -228,10 +183,8 @@ namespace BankApiService.Controllers
                 NewBalance = accountTo.Balance
             };
 
-            accountTo.Transactions.Add(transactionTo);
-            csvAccountService.UpdateEntityInformation(accountTo, _accountFileName);
-            csvTransactionService.WriteToCsv(new List<Transaction>() { transactionTo }, _transactionFileName);
-
+            _accountsService.UpdateAccount(accountTo);
+            _transactionsService.AddTransaction(transactionTo);
 
             return Ok(accountFrom);
         }
@@ -243,17 +196,12 @@ namespace BankApiService.Controllers
             [FromBody] UpdateOwnerNameRequest updateRequest
             )
         {
-            var account = _accountsService.GetAccountById(id);
+            var operationResult = _accountsService.UpdateOwnerName(id, updateRequest.Owner);
 
-            if (account == null)
+            if (operationResult == OperationResult.Failure)
             {
-                return BadRequest($"Account ID: {id} not found.");
+                return BadRequest($"Account with ID: {id} not found.");
             }
-
-            account.Owner = updateRequest.Owner;
-
-            _accountsService.UpdateAccount(account);
-
             return Accepted();
         }
 
@@ -261,7 +209,12 @@ namespace BankApiService.Controllers
         [HttpDelete("{id}")]
         public ActionResult DeleteById([FromRoute]int id)
         {
-            _accountsService.DeleteAccount(id);
+            var operationResult = _accountsService.DeleteAccount(id);
+
+            if (operationResult == OperationResult.Failure)
+            {
+                return BadRequest($"Account with ID: {id} not found.");
+            }
             return Ok();
         }
     }
